@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "player.h"
 #include "game.h"
 #include "windowManager.h"
 #include <string>
@@ -31,7 +32,8 @@ namespace BlackJack {
 
 	public ref class Form1 : public System::Windows::Forms::Form
 	{
-	private: System::Windows::Forms::Timer^ timer_NameError;
+	public: System::Windows::Forms::Timer^ timer_NameError;
+
 	private: System::Windows::Forms::Button^ button_Hit;
 	private: System::Windows::Forms::Button^ button_Stand;
 	private: System::Windows::Forms::Button^ button_DoubleDown;
@@ -41,10 +43,11 @@ namespace BlackJack {
 	private: System::Windows::Forms::TrackBar^ trackBar_Bet;
 	private: System::Windows::Forms::NumericUpDown^ numericUpDown_Bet;
 	private: System::Windows::Forms::Label^ label_BetName;
-
-
-	WindowManager^ windowManager;
 	private: System::Windows::Forms::Button^ button_ConfirmBet;
+
+	private:
+		WindowManager^ windowManager;
+	private: System::Windows::Forms::Button^ button_ShowCardsContinue;
 		   Game^ game;
 
 	public:
@@ -54,7 +57,7 @@ namespace BlackJack {
 
 			if (System::ComponentModel::LicenseManager::UsageMode != System::ComponentModel::LicenseUsageMode::Designtime) {
 				this->windowManager = gcnew WindowManager(this);
-				ManageWindow();			
+				this->ManageWindow();
 			}
 		}
 
@@ -71,95 +74,17 @@ namespace BlackJack {
 			}
 		}
 
-		// Få allas namn
-		void GetNames(int playerAmount) {
-			this->game = gcnew Game(playerAmount);
+		// 
+		void CreateGame(int playerAmount) {
+			this->game = gcnew Game(playerAmount, this, windowManager, timer_NameError);
 
-			this->windowManager->SetScreen("nameChoice");
-			ManageWindow();
-			this->textBox_Name->Focus();
+			this->game->GameStart(5000);
 		}
 
-		// Få vad alla bettar innan varje runda
-		void GetBets() {
-			Player^ player = this->game->GetPlayerList()[this->game->GetTurnPlayerNumber() - 1];
-			this->label_BetName->Text = player->GetName() + "'s bet:";
-			this->windowManager->SetScreen("bettingScreen");
-			SetBetMax();
-			ManageWindow();
+		// 
+		Control^ GetControl(String^ controlName) {
+			return this->Controls->Find(controlName, true)[0];
 		}
-
-		// Starta ett spel
-		void StartGame() {
-			this->game->SetAllBals();
-
-			GetBets();
-			ManageWindow();
-
-
-		}
-
-		// Sätt en spelares namn
-		void SetName() {
-			bool finished = false;
-
-			// Om man inte har skrivit in ett namn (lägg till fler felaktiga namn senare)
-			if (String::IsNullOrWhiteSpace(textBox_Name->Text)) {
-				this->label_NameError->Text = "Det kan du ju inte heta";
-				this->label_NameError->Visible = true;
-				this->timer_NameError->Interval = 3000;
-				this->timer_NameError->Start();
-				return;
-			}
-			if(this->game->GetTurnPlayerNumber() >= game->GetPlayerList()->Count) {
-				finished = true;
-			}
-
-			// Sätt namnet och gör så nästa spelare kan välja
-			this->game->SetName(this->textBox_Name->Text);
-			this->textBox_Name->Clear();
-			this->game->NextTurn(false);
-			this->label_NameInfo->Text = "Spelare " + this->game->GetTurnPlayerNumber() + "'s namn:";
-			this->textBox_Name->Focus();
-			
-			ManageWindow();
-
-			if(finished) {
-				StartGame();
-			}
-		}
-
-		//
-		void SetBet() {
-			bool finished = false;
-
-			int playerNumber = game->GetTurnPlayerNumber();
-			Player^ player = game->GetPlayerList()[playerNumber - 1];
-			this->trackBar_Bet->Maximum = player->GetBal();
-			this->numericUpDown_Bet->Maximum = player->GetBal();
-
-			// 
-			if (this->numericUpDown_Bet->Value <= 0) {
-				// GRRRR
-				return;
-			}
-
-			this->game->NextTurn(false);
-			this->label_NameInfo->Text = player->GetName(); +"'s bet:";
-
-			ManageWindow();
-
-		}
-
-		//
-		void SetBetMax() {
-			int playerNumber = this->game->GetTurnPlayerNumber();
-			Player^ player = this->game->GetPlayerList()[playerNumber - 1];
-			int value = player->GetBal();
-
-			windowManager->SetBetMax(value);
-		}
-
 
 		// ------------------------------ ↑ Funktioner ↑ ------------------------------ //
 
@@ -211,6 +136,7 @@ namespace BlackJack {
 			   this->numericUpDown_Bet = (gcnew System::Windows::Forms::NumericUpDown());
 			   this->label_BetName = (gcnew System::Windows::Forms::Label());
 			   this->button_ConfirmBet = (gcnew System::Windows::Forms::Button());
+			   this->button_ShowCardsContinue = (gcnew System::Windows::Forms::Button());
 			   (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->trackBar_Bet))->BeginInit();
 			   (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numericUpDown_Bet))->BeginInit();
 			   this->SuspendLayout();
@@ -420,13 +346,24 @@ namespace BlackJack {
 			   // 
 			   // button_ConfirmBet
 			   // 
+			   this->button_ConfirmBet->AutoSize = true;
+			   this->button_ConfirmBet->AutoSizeMode = System::Windows::Forms::AutoSizeMode::GrowAndShrink;
 			   this->button_ConfirmBet->Location = System::Drawing::Point(297, 131);
 			   this->button_ConfirmBet->Name = L"button_ConfirmBet";
-			   this->button_ConfirmBet->Size = System::Drawing::Size(75, 23);
+			   this->button_ConfirmBet->Size = System::Drawing::Size(52, 23);
 			   this->button_ConfirmBet->TabIndex = 18;
 			   this->button_ConfirmBet->Text = L"Confirm";
 			   this->button_ConfirmBet->UseVisualStyleBackColor = true;
 			   this->button_ConfirmBet->Click += gcnew System::EventHandler(this, &Form1::button_ConfirmBet_Click);
+			   // 
+			   // button_ShowCardsContinue
+			   // 
+			   this->button_ShowCardsContinue->Location = System::Drawing::Point(297, 188);
+			   this->button_ShowCardsContinue->Name = L"button_ShowCardsContinue";
+			   this->button_ShowCardsContinue->Size = System::Drawing::Size(75, 23);
+			   this->button_ShowCardsContinue->TabIndex = 19;
+			   this->button_ShowCardsContinue->Text = L"Continue";
+			   this->button_ShowCardsContinue->UseVisualStyleBackColor = true;
 			   // 
 			   // Form1
 			   // 
@@ -434,6 +371,7 @@ namespace BlackJack {
 			   this->AutoScaleMode = System::Windows::Forms::AutoScaleMode::Font;
 			   this->BackgroundImageLayout = System::Windows::Forms::ImageLayout::Zoom;
 			   this->ClientSize = System::Drawing::Size(789, 430);
+			   this->Controls->Add(this->button_ShowCardsContinue);
 			   this->Controls->Add(this->button_ConfirmBet);
 			   this->Controls->Add(this->label_BetName);
 			   this->Controls->Add(this->numericUpDown_Bet);
@@ -467,23 +405,23 @@ namespace BlackJack {
 
 
 	private: System::Void button_PlayerAmountOne_Click(System::Object^ sender, System::EventArgs^ e) {
-		GetNames(1);
+		this->CreateGame(1);
 	}
 	private: System::Void button_PlayerAmountTwo_Click(System::Object^ sender, System::EventArgs^ e) {
-		GetNames(2);
+		this->CreateGame(2);
 	}
 	private: System::Void button_PlayerAmountThree_Click(System::Object^ sender, System::EventArgs^ e) {
-		GetNames(3);
+		this->CreateGame(3);
 	}
 	private: System::Void button_PlayerAmountFour_Click(System::Object^ sender, System::EventArgs^ e) {
-		GetNames(4);
+		this->CreateGame(4);
 	}
 	private: System::Void button_PlayerAmountFive_Click(System::Object^ sender, System::EventArgs^ e) {
-		GetNames(5);
+		this->CreateGame(5);
 	}
 
 	private: System::Void button_NameConfirm_Click(System::Object^ sender, System::EventArgs^ e) {
-		SetName();
+		this->game->SetName();
 	}
 
 	private: System::Void Form1_Resize(System::Object^ sender, System::EventArgs^ e) {
@@ -507,7 +445,7 @@ namespace BlackJack {
 	}
 
 	private: System::Void button_ConfirmBet_Click(System::Object^ sender, System::EventArgs^ e) {
-		SetBet();
+		this->game->SetBet();
 	}
 };
 }

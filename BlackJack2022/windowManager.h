@@ -1,3 +1,5 @@
+#pragma once
+
 using namespace System;
 using namespace System::ComponentModel;
 using namespace System::Collections;
@@ -5,11 +7,15 @@ using namespace System::Windows::Forms;
 using namespace System::Data;
 using namespace System::Drawing;
 
+//
+Control^ GetControl(String^ controlName, Form^ form) {
+	return form->Controls->Find(controlName, true)[0];
+}
+
 // Få största font-storleken man kan ha i en label eller knapp utan att den skär sig
 private ref class GetMaxFontSize {
 private:
 	Form^ form;
-	Graphics^ graphics;
 	float maxFontSize;
 
 	int textWidth;
@@ -18,7 +24,7 @@ private:
 	void GetStringSize(System::String^ text) {
 		// Använd MeasureString för att räkna ut bredden och längden
 		System::Drawing::Font^ font = gcnew System::Drawing::Font("Arial", maxFontSize);
-		SizeF size = this->graphics->MeasureString(text, font);
+		Size size = TextRenderer::MeasureText(text, font);
 
 		// Sätt storleken
 		textWidth = static_cast<int>(size.Width);
@@ -29,7 +35,6 @@ public:
 	// Initialization
 	GetMaxFontSize(Form^ form) {
 		this->form = form;
-		this->graphics = form->CreateGraphics();
 	}
 
 	// Den functionen som man använder utanför
@@ -307,6 +312,7 @@ private:
 		this->buttonSurrender->Location = Point(this->buttonSplit->Left + this->buttonSplit->Width + padding, y);
 	}
 
+	//
 	void ResizeButtons(float size) {
 		Font^ font = gcnew Font("Arial", size);
 
@@ -317,10 +323,11 @@ private:
 		this->buttonSurrender->Font = font;
 	}
 
+	//
 	void AlignDealerCards(List<PictureBox^>^ list) {
 		double maxRelativeHeight = 0.25;
 		double maxRelativeWidth = 0.9;
-		double heightToWidthRatio = 1.452;
+		double widthToHeightRatio = 1.452;
 
 		int topPadding = 10;
 		int sidePadding = 10;
@@ -329,7 +336,7 @@ private:
 		int maxCardWidth = (int)(this->form->ClientSize.Width * maxRelativeWidth + totalSidePadding) / (list->Count + 1);
 		int maxCardHeight = (int)(this->form->ClientSize.Height * maxRelativeHeight);
 
-		Drawing::Size cardSize = maxCardHeight >= maxCardWidth / heightToWidthRatio ? Drawing::Size((int)(maxCardWidth / heightToWidthRatio), maxCardWidth) : Drawing::Size(maxCardHeight, (int)(maxCardHeight * heightToWidthRatio));
+		Drawing::Size cardSize = maxCardHeight >= maxCardWidth / widthToHeightRatio ? Drawing::Size((int)(maxCardWidth / widthToHeightRatio), maxCardWidth) : Drawing::Size(maxCardHeight, (int)(maxCardHeight * widthToHeightRatio));
 
 		// Placera alla kort
 		for each (PictureBox^ currentCard in list) {
@@ -350,7 +357,7 @@ public:
 	PlayingScreenManager(Form^ form) {
 		this->form = form;
 		this->getMaxFontSize = gcnew GetMaxFontSize(form);
-		this->dealerCards = gcnew List<PictureBox^>();
+		this->dealerCards = gcnew List<PictureBox^>(0);
 
 		// Hämta knapparna
 		array<Control^>^ controls = form->Controls->Find("button_Hit", true);
@@ -413,6 +420,8 @@ private:
 
 	NumericUpDown^ numericUpDown;
 	TrackBar^ trackBar;
+	Label^ label;
+	Button^ button;
 
 	// Sätt trackbaren på rätt ställe
 	void AlignTrackBar() {
@@ -444,22 +453,66 @@ private:
 		numericUpDown->Height = trackBar->Size.Height;
 	}
 
+	//
+	void AlignLabel() {
+		ResizeLabel();
+
+		int x = this->form->Size.Width / 2 - label->Size.Width / 2;
+		int y = this->trackBar->Top - this->label->Height;
+
+		this->label->Location = Point(x, y);
+	}
+
+	//
+	void ResizeLabel() {
+		int width = this->form->ClientSize.Width * 0.28;
+		int height = this->form->ClientSize.Height * 0.10;
+
+		float fontSize = this->getMaxFontSize->Get(width, height, this->label->Text);
+
+		this->label->Font = gcnew Font("Arial", fontSize);
+	}
+
+	void AlignButton() {
+		ResizeButton();
+
+		int x = this->form->ClientSize.Width / 2 - this->button->Width / 2;
+		int y = this->trackBar->Top + this->trackBar->Height + 10;
+
+		this->button->Location = Point(x, y);
+	}
+
+	void ResizeButton() {
+		int width = this->form->ClientSize.Width * 0.15;
+		int height = this->form->ClientSize.Height * 0.08;
+
+		float fontSize = this->getMaxFontSize->Get(width, height, this->button->Text);
+
+		this->button->Font = gcnew Font("Arial", fontSize);
+	}
+
 
 public:
 	BettingScreenManager(Form^ form) {
 		this->form = form;
+		this->getMaxFontSize = gcnew GetMaxFontSize(form);
 
 		array<Control^>^ controls = form->Controls->Find("numericUpDown_Bet", true);
 		this->numericUpDown = (NumericUpDown^)controls[0];
 		controls = form->Controls->Find("trackBar_Bet", true);
 		this->trackBar = (TrackBar^)controls[0];
-
+		controls = form->Controls->Find("label_BetName", true);
+		this->label = (Label^)controls[0];
+		controls = form->Controls->Find("button_ConfirmBet", true);
+		this->button = (Button^)controls[0];
 	}
 
 	// Sätt allt på rätt plats
 	void AlignAll() {
 		AlignTrackBar();
 		AlignNumericUpDown();
+		AlignLabel();
+		AlignButton();
 	}
 
 	// Visa eller dölj
@@ -470,24 +523,150 @@ public:
 
 		this->numericUpDown->Visible = value;
 		this->trackBar->Visible = value;
+		this->label->Visible = value;
+		this->button->Visible = value;
 	}
 
 	//
 	void SetBetMax(int value) {
 		this->numericUpDown->Maximum = value;
 		this->trackBar->Maximum = value;
+
+		this->numericUpDown->Value = 0;
+		this->trackBar->Value = 0;
+	}
+};
+
+private ref class ShowCardsManager {
+private:
+	Form^ form;
+	String^ currentScreen;
+
+	int playerAmount; // Hur många spelare som finns i spelet
+	int borderPadding; // Hur många pixlar det ska vara mellan korten och toppen/botten
+	int cardPadding; // Hur många pixlar det ska vara mellan korten
+
+	Button^ button; // Continue-knappen
+
+	List<PictureBox^>^ cardPictureBoxes;
+	List<Player^>^ players;
+
+	// 
+	void AlignCards() {
+		String^ orientation = this->form->ClientSize.Width >= this->form->ClientSize.Height ? "h" : "v"; // Om fönstret är horisontalt eller vertikalt (h = horisontalt, v = vertikalt)
+		Size size = ResizeCards(orientation); // Sätt och få storleken på korten
+		int x = 0, y = 0;
+		
+		// Sätt den gemensamma coordinaten för alla kort 
+		if (orientation == "h") {
+			y = (this->form->ClientSize.Height / 2) - (size.Height / 2);
+		} else {
+			x = (this->form->ClientSize.Width / 2) - (size.Width / 2);
+		}
+	
+		for each (PictureBox ^ currentCard in this->cardPictureBoxes) {
+			int cardNumber = this->cardPictureBoxes->IndexOf(currentCard) + 1;
+			int cardHeight = currentCard->Height;
+			int cardWidth = currentCard->Width;
+			int totalWidth = this->playerAmount * cardWidth + this->cardPadding * (this->playerAmount - 1);
+			int totalHeight = this->playerAmount * cardHeight + this->cardPadding * (this->playerAmount - 1);
+
+			if (orientation == "h") {
+				x = (cardNumber - 1) * cardWidth + this->cardPadding * (cardNumber - 1) + (this->form->ClientSize.Width/2 - totalWidth/2);
+			} else {
+				y = (cardNumber - 1) * cardHeight + this->cardPadding * (cardNumber - 1) + (this->form->ClientSize.Height / 2 - totalHeight / 2);
+			}
+
+			currentCard->Location = Point(x, y);
+		}
+	}
+
+	// 
+	Drawing::Size ResizeCards(String^ orientation) {
+		double widthToHeightRatio = 1.452;
+
+		int cardWidths, cardHeights;
+
+		if (orientation == "h") {
+			cardWidths = (this->form->ClientSize.Width - this->borderPadding * 2) / this->playerAmount - (this->cardPadding / this->playerAmount) * (this->playerAmount - 1);
+			cardHeights = this->form->ClientSize.Height * 0.5;
+		} else {
+			cardWidths = this->form->ClientSize.Width * 0.35;
+			cardHeights = (this->form->ClientSize.Height - this->borderPadding * 2) / this->playerAmount - (this->cardPadding / this->playerAmount) * (this->playerAmount - 1);
+		}
+
+		// Samma just nu men kanske ska ändra i framtiden
+		Size size = cardHeights <= cardWidths * widthToHeightRatio ? Size(cardHeights / widthToHeightRatio, cardHeights) : Size(cardWidths, cardWidths * widthToHeightRatio);
+	
+		// Sätt storleken på alla
+		for each (PictureBox ^ currentCard in this->cardPictureBoxes) {
+			currentCard->Size = size;
+		}
+
+		return size;
+	}
+
+public:
+	ShowCardsManager(Form^ form) {
+		this->form = form;
+		this->currentScreen = currentScreen;
+
+		this->borderPadding = form->ClientSize.Height * 0.05; // Hur många pixlar det ska vara mellan korten och toppen/botten
+		this->cardPadding = 15; // Hur många pixlar det ska vara mellan korten
+
+		this->button = (Button^)GetControl("button_ShowCardsContinue", form);
+
+		this->cardPictureBoxes = gcnew List<PictureBox^>(0);
+		this->players = gcnew List<Player^>(0);
+	}
+
+	// 
+	void AlignAll() {
+		if (this->cardPictureBoxes->Count > 0) {
+			AlignCards();
+		}
+	}
+
+	// 
+	void SetVisibility(String^ currentScreen) {
+		bool value = true;
+
+		if (currentScreen != "showCardsScreen") {
+			value = false;
+		}
+
+		// ALLA CONTROLS
+		this->button->Visible = value;
+	}
+
+	// 
+	void ShowCards(List<Player^>^ players, List<String^>^ cards) {
+		this->playerAmount = players->Count;
+
+		// Skapa PictureBoxes till alla kort
+		for (int i = 0; i < this->playerAmount; i++) {
+			PictureBox^ newCard = gcnew PictureBox();
+			newCard->Image = Image::FromFile("playing cards/" + cards[i] + ".png");
+			newCard->SizeMode = PictureBoxSizeMode::Zoom;
+			this->cardPictureBoxes->Add(newCard);
+			this->form->Controls->Add(newCard);
+		}
+
+		AlignCards();
 	}
 };
 
 public ref class WindowManager {
 private:
 	Form^ form;
+	String^ currentScreen;
+
 	PlayerChoiceScreenManager^ playerChoiceScreenManager;
 	PlayerNameChoiceManager^ playerNameChoiceManager;
 	PlayingScreenManager^ playingScreenManager;
 	BettingScreenManager^ bettingScreenManager;
+	ShowCardsManager^ showCardsManager;
 
-	String^ currentScreen;
 
 public:
 	WindowManager(Form^ form) {
@@ -496,23 +675,28 @@ public:
 		this->playerNameChoiceManager = gcnew PlayerNameChoiceManager(form);
 		this->playingScreenManager = gcnew PlayingScreenManager(form);
 		this->bettingScreenManager = gcnew BettingScreenManager(form);
+		this->showCardsManager = gcnew ShowCardsManager(form);
 
 		this->currentScreen = "playerChoice";
 	}
 
+	//
 	void AlignAll() {
 		if (this->form->WindowState == FormWindowState::Minimized) { return; }
 		playerChoiceScreenManager->AlignAll();
 		playerNameChoiceManager->AlignAll();
 		playingScreenManager->AlignAll();
 		bettingScreenManager->AlignAll();
+		showCardsManager->AlignAll();
 	}
 
+	//
 	void SetAllVisibility() {
 		playerChoiceScreenManager->SetVisibility(this->currentScreen);
 		playerNameChoiceManager->SetVisibility(this->currentScreen);
 		playingScreenManager->SetVisibility(this->currentScreen);
 		bettingScreenManager->SetVisibility(this->currentScreen);
+		showCardsManager->SetVisibility(this->currentScreen);
 	}
 
 	// 
@@ -525,11 +709,25 @@ public:
 		this->currentScreen = screen;
 	}
 
+	//
 	void AddDealerCard(String^ cardName) {
 		playingScreenManager->AddDealerCard(cardName);
 	}
 
+	//
 	void SetBetMax(int value) {
 		this->bettingScreenManager->SetBetMax(value);
+	}
+
+	// 
+	void SetBetName(String^ name) {
+		Label^ label = (Label^)GetControl("label_BetName", this->form);
+
+		label->Text = name + "'s bet:";
+	}
+
+	//
+	void ShowCards(List<Player^>^ players, List<String^>^ cards) {
+		this->showCardsManager->ShowCards(players, cards);
 	}
 };
